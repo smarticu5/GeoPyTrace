@@ -2,10 +2,10 @@ __author__ = 'Iain Smart'
 # Python Cross-Platform Traceroute
 # Code for traceroute adapted from https://blogs.oracle.com/ksplice/entry/learning_by_doing_writing_your, 28/07/2010
 
-# TODO: Fix Mapping to follow earth's curvature
+# TODO: Map Line
 # TODO: Test on Windows (Done. Doesn't work.)
 # TODO: More KML Info
-# TODO: Missing hop information
+# TODO: First hop information
 # TOMAYBEDO: Pi Screen Stuff
 
 import os
@@ -14,6 +14,8 @@ import json
 import socket
 import sys
 import urllib2
+
+coordString = ''
 
 # Traceroute
 def DNSLookup(dest_hostname):
@@ -97,21 +99,23 @@ def GEOIPLookup(ip_addresses):
 		if address is None and i != 1:
 			print '[%sWarning%s] No address for this hop. Using previous address: %s' % (bcolors.WARNING, bcolors.ENDC, prevAddr)
 			address = prevAddr
-			# TODO: What is it's 1?
+			# TODO: What if it's 1?
 
 		print 'Address:\t%s' % address
 		data = json.load(urllib2.urlopen('http://ip-api.com/json/%s' % address))
-
+		coordString += '%s, %s\n' % (str(data['lon']), str(data['lat']))
 		KMLWriteLocation(data, i, address)
 		prevAddr = address
 
 		if moreAddresses is False:
 			print '[%sInfo%s] No more addresses to process.' % (bcolors.OKGREEN, bcolors.ENDC)
+
 			return
 
 def KMLWriteLocation(returnedData, hopCount, address):
 	# Write to file
 	writeText = ''
+
 	try:
 		KMLFile = open('IP2.kml', 'a')
 
@@ -120,16 +124,17 @@ def KMLWriteLocation(returnedData, hopCount, address):
 		isp = str(returnedData['isp'])
 		lat = str(returnedData['lat'])
 		lon = str(returnedData['lon'])
-		coordinates = '%s, %s' % (lat, lon)
+		coordinates = '%s, %s' % (lon, lat)
+		global coordString += '%s\n' % coordinates
 		print 'City:\t\t%s\nCountry:\t%s\nISP:\t\t%s\nLat:\t\t%s\nLon:\t\t%s\n' % (city, country, isp, lat, lon)
 
-		writeText = '<PlaceMark>\n\t<name>%s</name>\n\t<description>\n\t\tIP Address:\t%s\n\t\tCountry:\t%s\n\t\tCity:\t\t%s\n\t\tISP:\t\t%s\n\t</description>\n\t<point>\n\t\t<coordinates>\n\t\t\t%s\n\t\t</coordinates>\n\t</point>\n</PlaceMark>\n' % (hopCount, address, country, city, isp, coordinates)
+		writeText = '<Placemark>\n\t<name>%s</name>\n\t<description>\n\t\tIP Address:\t%s\n\t\tCountry:\t%s\n\t\tCity:\t\t%s\n\t\tISP:\t\t%s\n\t</description>\n\t<Point>\n\t\t<coordinates>\n\t\t\t%s\n\t\t</coordinates>\n\t</Point>\n</Placemark>\n' % (hopCount, address, country, city, isp, coordinates)
 
 		KMLFile.write(writeText)
 		KMLFile.close()
 
 	except IOError:
-		print 'IOError: File \'IP2.kml\' cannnot be found. Even though this program created it, so stop messing with me.'
+		print 'IOError: File \'IP2.kml\' cannot be found. Even though this program created it, so stop messing with me.'
 
 	except KeyError:
 		if address[:3:] == '10.':
