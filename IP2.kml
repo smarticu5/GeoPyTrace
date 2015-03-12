@@ -1,0 +1,242 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<kml xmlns="http://earth.google.com/kml/2.0">
+<Document>
+<PlaceMark>
+	<name>3</name>
+	<description>
+		IP Address:	193.60.160.253
+		Country:	United Kingdom
+		City:		Dundee
+		ISP:		Janet
+	</description>
+	<point>
+		<coordinates>
+			56.5, -2.9667
+		</coordinates>
+	</point>
+</PlaceMark>
+<PlaceMark>
+	<name>4</name>
+	<description>
+		IP Address:	193.60.160.253
+		Country:	United Kingdom
+		City:		Dundee
+		ISP:		Janet
+	</description>
+	<point>
+		<coordinates>
+			56.5, -2.9667
+		</coordinates>
+	</point>
+</PlaceMark>
+<PlaceMark>
+	<name>5</name>
+	<description>
+		IP Address:	193.60.168.92
+		Country:	United Kingdom
+		City:		Dundee
+		ISP:		Janet
+	</description>
+	<point>
+		<coordinates>
+			56.5, -2.9667
+		</coordinates>
+	</point>
+</PlaceMark>
+<PlaceMark>
+	<name>6</name>
+	<description>
+		IP Address:	146.97.128.85
+		Country:	United Kingdom
+		City:		
+		ISP:		Janet
+	</description>
+	<point>
+		<coordinates>
+			51.5, -0.13
+		</coordinates>
+	</point>
+</PlaceMark>
+<PlaceMark>
+	<name>7</name>
+	<description>
+		IP Address:	146.97.64.97
+		Country:	United Kingdom
+		City:		
+		ISP:		Janet
+	</description>
+	<point>
+		<coordinates>
+			51.5, -0.13
+		</coordinates>
+	</point>
+</PlaceMark>
+<PlaceMark>
+	<name>8</name>
+	<description>
+		IP Address:	146.97.37.181
+		Country:	United Kingdom
+		City:		
+		ISP:		Janet
+	</description>
+	<point>
+		<coordinates>
+			51.5, -0.13
+		</coordinates>
+	</point>
+</PlaceMark>
+<PlaceMark>
+	<name>9</name>
+	<description>
+		IP Address:	146.97.33.50
+		Country:	United Kingdom
+		City:		
+		ISP:		Janet
+	</description>
+	<point>
+		<coordinates>
+			51.5, -0.13
+		</coordinates>
+	</point>
+</PlaceMark>
+<PlaceMark>
+	<name>10</name>
+	<description>
+		IP Address:	146.97.33.30
+		Country:	United Kingdom
+		City:		
+		ISP:		Janet
+	</description>
+	<point>
+		<coordinates>
+			51.5, -0.13
+		</coordinates>
+	</point>
+</PlaceMark>
+<PlaceMark>
+	<name>11</name>
+	<description>
+		IP Address:	146.97.33.10
+		Country:	United Kingdom
+		City:		
+		ISP:		Janet
+	</description>
+	<point>
+		<coordinates>
+			51.5, -0.13
+		</coordinates>
+	</point>
+</PlaceMark>
+<PlaceMark>
+	<name>12</name>
+	<description>
+		IP Address:	146.97.35.182
+		Country:	United Kingdom
+		City:		
+		ISP:		Janet
+	</description>
+	<point>
+		<coordinates>
+			51.5, -0.13
+		</coordinates>
+	</point>
+</PlaceMark>
+<PlaceMark>
+	<name>13</name>
+	<description>
+		IP Address:	195.66.224.21
+		Country:	United Kingdom
+		City:		London
+		ISP:		London Internet Exchange Ltd.
+	</description>
+	<point>
+		<coordinates>
+			51.5142, -0.0931
+		</coordinates>
+	</point>
+</PlaceMark>
+<PlaceMark>
+	<name>14</name>
+	<description>
+		IP Address:	72.52.92.166
+		Country:	United States
+		City:		Fremont
+		ISP:		Hurricane Electric
+	</description>
+	<point>
+		<coordinates>
+			37.5155, -121.8962
+		</coordinates>
+	</point>
+</PlaceMark>
+<PlaceMark>
+	<name>15</name>
+	<description>
+		IP Address:	72.52.92.226
+		Country:	United States
+		City:		Fremont
+		ISP:		Hurricane Electric
+	</description>
+	<point>
+		<coordinates>
+			37.5155, -121.8962
+		</coordinates>
+	</point>
+</PlaceMark>
+<PlaceMark>
+	<name>16</name>
+	<description>
+		IP Address:	72.52.92.122
+		Country:	United States
+		City:		Fremont
+		ISP:		Hurricane Electric
+	</description>
+	<point>
+		<coordinates>
+			37.5155, -121.8962
+		</coordinates>
+	</point>
+</PlaceMark>
+<PlaceMark>
+	<name>17</name>
+	<description>
+		IP Address:	66.220.10.122
+		Country:	United States
+		City:		Portland
+		ISP:		Hurricane Electric
+	</description>
+	<point>
+		<coordinates>
+			45.5171, -122.6802
+		</coordinates>
+	</point>
+</PlaceMark>
+<PlaceMark>
+	<name>18</name>
+	<description>
+		IP Address:	66.220.10.122
+		Country:	United States
+		City:		Portland
+		ISP:		Hurricane Electric
+	</description>
+	<point>
+		<coordinates>
+			45.5171, -122.6802
+		</coordinates>
+	</point>
+</PlaceMark>
+<PlaceMark>
+	<name>19</name>
+	<description>
+		IP Address:	23.91.14.101
+		Country:	United States
+		City:		Walnut
+		ISP:		Psychz Networks
+	</description>
+	<point>
+		<coordinates>
+			34.0115, -117.8535
+		</coordinates>
+	</point>
+</PlaceMark>
+</Document> </kml>
