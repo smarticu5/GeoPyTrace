@@ -15,26 +15,71 @@ import sys
 import requests
 import argparse
 
-coordString = ''
+# Global constants
+GEOLookup = 'http://ip-api.com/json/'
+WHOIS = 'http://whois.domaintools.com/'
+if 'nt' in os.name: WINDOWS = True
+else: WINDOWS = False
 
-# Traceroute
-def DNSLookup(dest_hostname):
-	# Set up initial requirements
-	ip_addresses = []
+def get_args():
+	# Arguments from command line
+	parser = argparse.ArgumentParser(prog="FinalTrace")
+	parser.add_argument('-b', '--bytesize', default=512, type=int, help='Number of bytes to read on the receiving socket')
+	parser.add_argument('-d', '--destination', default='www.hacksoc.co.uk', type=str, help='Destination to trace to')
+	parser.add_argument('-o', '--output', default='Traceroute.kml', type=str, help='File to be used for KML')
+	parser.add_argument('-p', '--port', default=33464, type=int, help='Port to use for receiving packets')
+	parser.add_argument('-t', '--TTL', default=20, type=int, help='Maximum number of hops to target')
+	parser.add_argument('-v', '--verbosity', action='store_true', help='Control program verbosity')
+
+	arguments = parser.parse_args()
+	if not check_ip(arguments.destination): # If hostname, not IP, has been entered
+		if arguments.verbosity: print '[Info] Inspection suggests destination is not an IP address'
+		print '[Info] Attempting to resolve \'%s\' to IP address' % arguments.destination
+
+		ip = DNS_Lookup(arguments.destination)
+		if arguments.verbosity: print '[Info] %s resolved successfully to %s' % (arguments.destination, ip)
+		arguments.destination = ip
+	if arguments.verbosity:
+		print
+		print '[Info] Destination:\t%s' % arguments.destination
+		print '[Info] Byte Size:\t%s' % arguments.bytesize
+		print '[Info] Output File:\t%s' % arguments.output
+		print '[Info] Port:\t\t%s' % arguments.port
+		print '[Info] Max Hops:\t%s' % arguments.TTL
+		print
+	return arguments
+
+# Check if -d parameter is an IP Address
+def check_ip(testString):
+	octets = testString.split('.')
+	# Split into sections based on '.'
+	if len(octets) < 4:
+		return False # If there aren't 4, it's not an IP
+	else:
+		for octet in octets:
+			if not octet.isdigit():
+				return False
+			if not 0 <= int(octet) <= 255: # Each number must be 0-255
+				return False
+	return True
+
+# Attempt DNS Lookup if not an IP already
+def DNS_Lookup(hostname):
 	try:
-		dest_ip_address = socket.gethostbyname(dest_hostname)
-		print 'Tracing route to %s' % dest_ip_address
-	except:
-		print '[%sWarning%s] Unable to resolve host %s. Exiting' % (bcolors.FAIL, bcolors.ENDC, dest_hostname)
-		sys.exit(1)
-	port = 13378 # Can be anything, really. Unlikely to be used.
+		return socket.gethostbyname(hostname)
+	except socket.gaierror:
+		print '[Error] Unable to resolve hostname. Quitting.'
+		sys.exit()
+
+# Actual Traceroute for *nix based systems
+def nixTraceroute(arguments):
+	byte_size = arguments.bytesize
+	port = arguments.port # Can be anything, really.
 	icmp = socket.getprotobyname('icmp')
 	udp = socket.getprotobyname('udp')
-
-	max_hops = 30 # for now, at least
-
-	# Set up incrementing TTL Fields, as per Traceroute spec.
 	TTL = 1
+	destination = arguments.destination
+	IPAddresses = []
 
 	try:
 		while True:
@@ -45,148 +90,126 @@ def DNSLookup(dest_hostname):
 
 			# Set up packet
 			send_socket.setsockopt(socket.SOL_IP, socket.IP_TTL, TTL)
-
 			# Bind listener
 			recv_socket.bind(("", port))
 
 			#Send packet
-			send_socket.sendto("", (dest_hostname, port))
+			send_socket.sendto("", (destination, port))
 			current_ip_address = None
 			current_name = None
 
-			# Check response address
 			try:
 				_, current_ip_address = recv_socket.recvfrom(byte_size)
 				current_ip_address = current_ip_address[0]
 				try:
 					current_name = socket.gethostbyaddr(current_ip_address)[0]
 				except socket.error:
-					current_name = str(current_ip_address) # For if there ain't no name!
+					current_name = '*'
 			except socket.error:
-				pass # No need for better error handling, makes the program look untidy on timeout.
+				pass
 			finally:
 				send_socket.close()
 				recv_socket.close()
 
-			if current_ip_address is not None: # i.e. hop data is not given
+			if current_ip_address is not None:
 				current_host = "%s (%s)" % (current_name, current_ip_address)
-			else: # Some servers can disable responses
+			else:
 				current_host = "*"
-			ip_addresses.append(current_ip_address)
+
+			IPAddresses.append(current_ip_address)
 			print "%d\t%s" % (TTL, current_host)
 
-			# Increment TTL
 			TTL += 1
 
-			if current_ip_address == dest_ip_address or TTL > max_hops:
-				print '\n[%sInfo%s] Traceroute complete.\n'
-				time.sleep(1)
+			if current_ip_address == destination or TTL > args.TTL:
+				if TTL > args.TTL:
+					print '\n[Warn] Max TTL Exceeded'
+				if current_ip_address == destination:
+					print '\n[Info] Destination reached'
 				break
+
 	except KeyboardInterrupt:
-		print '\n[%sWarning%s] Keyboard Interrupt. Exiting traceroute.' % (bcolors.WARNING, bcolors.ENDC)
+		print 'Keyboard Interrupt. Exiting Traceroute'
 	finally:
-		return ip_addresses
+		return IPAddresses
 
-# GEOIP Lookup
-def GEOIPLookup(ip_addresses):
+# Actual Traceroute for Windows systems
+def windowsTraceroute():
+	pass
+
+def GEOIPLookup(addresses, arguments):
 	prevAddr = '0.0.0.0'
-	i = 1
+	hopNumber = 1
 
-	print 'Performing GEOIP Lookups and filling KML File\n'
-
-	for address in ip_addresses:
+	print '\n[Info] Beginning GeoIP Lookups'
+	for address in addresses:
 		moreAddresses = False
-		for followingAddress in ip_addresses[i::]:
+		for followingAddress in addresses[hopNumber::]: # To determine if there are any hosts still needing looked up
 			if followingAddress != address:
 				moreAddresses = True
-
-		print 'Hop Number:\t%s' % i
-		i += 1
-		if address is None and i != 1:
-			print '[%sWarning%s] No address for this hop. Using previous address: %s' % (bcolors.WARNING, bcolors.ENDC, prevAddr)
-			address = prevAddr
-			# TODO: What if it's 1?
-
-		print 'Address:\t%s' % address
-		r = requests.get('http://ip-api.com/json/%s' % address)
-		data = r.json()
-		KMLWriteLocation(data, i, address)
-		prevAddr = address
+				break
 
 		if moreAddresses is False:
-			print '[%sInfo%s] No more addresses to process.' % (bcolors.OKGREEN, bcolors.ENDC)
-
+			print
+			print '[Info] No more addresses to process'
+			print '[Info] GEOIP Lookups completed'
 			return
 
-def KMLWriteLocation(returnedData, hopCount, address):
-	# Write to file
+		if args.verbosity: print 'Hop number: %s' % hopNumber
+		if address is None:
+			if args.verbosity: print '[Warn] No address for this hop. Attempting to use previous address.'
+			if prevAddr == '0.0.0.0':
+				if args.verbosity: print '[Warn] No previous address available.'
+			else:
+				address = prevAddr
+
+		r = requests.get(GEOLookup + str(address))
+		data = r.json()
+		KMLWriteLocation(data, hopNumber, args)
+
+		prevAddr = address
+		hopNumber = hopNumber + 1
+
+def GenKML():
+	pass
+
+def KMLWriteLocation(data, i, args):
+		# Write to file
 	writeText = ''
-
 	try:
-		KMLFile = open('IP2.kml', 'a')
-
-		city = str(returnedData['city'])
-		country = str(returnedData['country'])
-		isp = str(returnedData['isp'])
-		lat = str(returnedData['lat'])
-		lon = str(returnedData['lon'])
-		coordinates = '%s, %s' % (lon, lat)
-		print 'City:\t\t%s\nCountry:\t%s\nISP:\t\t%s\nLat:\t\t%s\nLon:\t\t%s\n' % (city, country, isp, lat, lon)
-
-		writeText = '<Placemark>\n\t<name>%s</name>\n\t<description>\n\t\tIP Address:\t%s\n\t\tCountry:\t%s\n\t\tCity:\t\t%s\n\t\tISP:\t\t%s\n\t</description>\n\t<Point>\n\t\t<coordinates>\n\t\t\t%s\n\t\t</coordinates>\n\t</Point>\n</Placemark>\n' % (hopCount, address, country, city, isp, coordinates)
-
-		KMLFile.write(writeText)
-		KMLFile.close()
-
+		if data['status'] == 'success':
+			# KMLFile = open('IP2.kml', 'a')
+			city = str(data['city'])
+			country = str(data['country'])
+			isp = str(data['isp'])
+			lat = str(data['lat'])
+			lon = str(data['lon'])
+			coordinates = '%s, %s' % (lon, lat)
+			if args.verbosity: print 'City:\t\t%s\nCountry:\t%s\nISP:\t\t%s\nLat:\t\t%s\nLon:\t\t%s\n' % (city, country, isp, lat, lon)
+			# writeText = '<Placemark>\n\t<name>%s</name>\n\t<description>\n\t\tIP Address:\t%s\n\t\tCountry:\t%s\n\t\tCity:\t\t%s\n\t\tISP:\t\t%s\n\t</description>\n\t<Point>\n\t\t<coordinates>\n\t\t\t%s\n\t\t</coordinates>\n\t</Point>\n</Placemark>\n' % (hopCount, address, country, city, isp, coordinates)
+			# KMLFile.write(writeText)
+			# KMLFile.close()
 	except IOError:
 		print 'IOError: File \'IP2.kml\' cannot be found. Even though this program created it, so stop messing with me.'
-
 	except KeyError:
-		if address[:3:] == '10.':
-			print '[%sWarning%s] 10.*.*.* is a reserved IP Range. No Info Available.\n' % (bcolors.WARNING, bcolors.ENDC)
-		elif address[:7:] == '172.16.':
-			print '[%sWarning%s] 172.*.*.* is a reserved IP Range. No Info Available.\n'  % (bcolors.WARNING, bcolors.ENDC)
-		elif address[:4:] == '192.':
-			print '[%sWarning%s] 192.*.*.* is a reserved IP Range. No Info Available.\n'  % (bcolors.WARNING, bcolors.ENDC)
-		elif address[:2:] == '0.':
-			print '[%sWarning%s] 0.*.*.* isn\'t a thing. What did you do this time?\n'  % (bcolors.WARNING, bcolors.ENDC)
-		else:
-			print 'KeyError. Well that was unexpected'
+		print 'Unexpected Keyerror. Wut?'
 
-class bcolors:
-	HEADER = '\033[95m'
-	OKBLUE = '\033[94m'
-	OKGREEN = '\033[92m'
-	WARNING = '\033[93m'
-	FAIL = '\033[91m'
-	ENDC = '\033[0m'
-	BOLD = '\033[1m'
-	UNDERLINE = '\033[4m'
-
-def __init__():
-	argParser = argparse.ArgumentParser(prog="FinalTrace")
-	argParser.add_argument('-d', '--destination', default = 'www.google.com', type = 'str', help = 'Destination host')
-	argParser.add_argument('-o', '--output', default = 'IP2.kml', type = 'str', help = 'Output KML File')
-
-
-
-	if os.name == 'nt':
-		print 'Naw mate!'
+if __name__ == "__main__":
+	print '''
+   ___             ___      _____
+  / _ \___  ___   / _ \_   /__   \_ __ __ _  ___ ___
+ / /_\/ _ \/ _ \ / /_)/ | | |/ /\/ '__/ _` |/ __/ _ \\
+/ /_\\\\  __/ (_) / ___/| |_| / /  | | | (_| | (_|  __/
+\____/\___|\___/\/     \__, \/   |_|  \__,_|\___\___|
+                       |___/
+				Iain Smart (1202028)
+'''
+	# Get arguments from command line
+	args = get_args()
+	if WINDOWS:
+		print '[Info] Performing Windows Traceroute'
+		pass # Go do Windows Traceroute
 	else:
-		if not os.geteuid() == 0:
-			print '[%sError%s] Script must be run as root.' % (bcolors.FAIL, bcolors.ENDC)
-			sys.exit(1)
-		hostname = raw_input('Enter a destination: ')
-		# hostname = 'hacksocClone'
-		ip_addresses = DNSLookup(hostname)
-		print '[%sInfo%s] Creating KML File' % (bcolors.OKGREEN, bcolors.ENDC)
-		KMLFile = open('IP2.kml', 'w')
-		KMLFile.write('<?xml version="1.0" encoding="UTF-8"?>\n<kml xmlns="http://earth.google.com/kml/2.0">\n<Document>\n')
-		KMLFile.close()
-		GEOIPLookup(ip_addresses)
-		KMLFile = open('IP2.kml', 'a')
-		KMLFile.write('</Document> </kml>')
-		KMLFile.close()
-		print '[%sInfo%s] KML File Closed' % (bcolors.OKGREEN, bcolors.ENDC)
-
-__init__()
+		print '[Info] Performing *nix Traceroute'
+		IPAddresses = nixTraceroute(args)
+	GEOIPLookup(IPAddresses, args)
