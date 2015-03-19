@@ -24,23 +24,50 @@ else: WINDOWS = False
 def get_args():
 	# Arguments from command line
 	parser = argparse.ArgumentParser(prog="FinalTrace")
-	parser.add_argument('-b', '--bytesize', default=512, type=int, help='Number of bytes to read on the receiving socket')
+
+	# Important options
 	parser.add_argument('-d', '--destination', default='www.hacksoc.co.uk', type=str, help='Destination to trace to')
-	parser.add_argument('--debug', action='store_true', help='Enable Debugging Statements')
 	parser.add_argument('-o', '--output', default='Traceroute.kml', type=str, help='File to be used for KML')
+
+	# Packet specific settings
+	parser.add_argument('-b', '--bytesize', default=512, type=int, help='Number of bytes to read on the receiving socket')
 	parser.add_argument('-p', '--port', default=33464, type=int, help='Port to use for receiving packets')
 	parser.add_argument('-t', '--TTL', default=20, type=int, help='Maximum number of hops to target')
+
+	# Program verbosity
+	parser.add_argument('--debug', action='store_true', help='Enable Debugging Statements')
 	parser.add_argument('-v', '--verbosity', action='store_true', help='Control program verbosity')
 
+	# Actions on completion
+	parser.add_argument('-lG', action='store_true', help='Automatically open KML File in Google Maps')
+	parser.add_argument('-lE', action='store_true', help='Automatically open KML File in Google Earth')
+
 	arguments = parser.parse_args()
-	if not check_ip(arguments.destination): # If hostname, not IP, has been entered
-		if arguments.verbosity or arguments.debug: print '[Info] Inspection suggests destination is not an IP address'
-		print '[Info] Attempting to resolve \'%s\' to IP address' % arguments.destination
+	# Check if destination is hostname or IP
+	if not check_ip(arguments.destination):
+		if arguments.verbosity:
+			print '[Info] Inspection suggests destination is not an IP address'
+			print '[Info] Attempting to resolve \'%s\' to IP address' % arguments.destination
 
 		ip = DNS_Lookup(arguments.destination)
 		if arguments.verbosity: print '[Info] %s resolved successfully to %s' % (arguments.destination, ip)
 		arguments.destination = ip
-	if arguments.verbosity or arguments.debug:
+
+	# Check if file specified by -o exists
+	try:
+		if arguments.verbosity: print '[Info] Checking if file %s exists' % arguments.output
+		outfile = open(arguments.output, 'r')
+		if arguments.debug: print '[Debug] File exists'
+	except IOError:
+		print '[Warn] File %s not found. Attempting to create.' % arguments.output
+		try:
+			outfile = open(arguments.output, 'w')
+			print '[Info] File %s created' % arguments.output
+		except IOError:
+			print '[Error] Unable to create file. Exiting.'
+			sys.exit()
+
+	if arguments.verbosity:
 		print '[Info] Destination:\t%s' % arguments.destination
 		print '[Info] Byte Size:\t%s' % arguments.bytesize
 		print '[Info] Output File:\t%s' % arguments.output
@@ -51,8 +78,7 @@ def get_args():
 
 # Check if -d parameter is an IP Address
 def check_ip(testString):
-	octets = testString.split('.')
-	# Split into sections based on '.'
+	octets = testString.split('.') # Split into sections based on '.'
 	if len(octets) < 4:
 		return False # If there aren't 4, it's not an IP
 	else:
@@ -129,7 +155,7 @@ def nixTraceroute(arguments):
 				break
 
 	except KeyboardInterrupt:
-		print 'Keyboard Interrupt. Exiting Traceroute'
+		print '[Info] Keyboard Interrupt. Exiting Traceroute'
 	finally:
 		return IPAddresses
 
@@ -142,10 +168,10 @@ def GEOIPLookup(addresses, arguments):
 	hopNumber = 1
 
 	print '\n[Info] Beginning GeoIP Lookups'
-	if arguments.debug: print '[Debug] %s' % addresses
+	if arguments.debug: print '[Debug] Address List: %s' % addresses
 	for address in addresses:
-		if arguments.debug: print '[Debug] %s' % address
-		moreAddresses = False
+		if arguments.debug: print '[Debug] Current Address: %s' % address
+		moreAddresses = False # Default to nothing else to do. Fail closed, I guess.
 		for followingAddress in addresses[hopNumber::]: # To determine if there are any hosts still needing looked up
 			if followingAddress != address:
 				moreAddresses = True
@@ -153,9 +179,9 @@ def GEOIPLookup(addresses, arguments):
 
 		if args.verbosity: print 'Hop number: %s' % hopNumber
 		if address is None:
-			if args.verbosity or arguments.debug: print '[Warn] No address for this hop. Attempting to use previous address.'
+			if args.verbosity: print '[Warn] No address for this hop. Attempting to use previous address.'
 			if prevAddr == '0.0.0.0':
-				if args.verbosity or arguments.debug: print '[Warn] No previous address available.'
+				if args.verbosity: print '[Warn] No previous address available.'
 			else:
 				address = prevAddr
 
@@ -164,7 +190,7 @@ def GEOIPLookup(addresses, arguments):
 		KMLWriteLocation(data, hopNumber, args)
 
 		prevAddr = address
-		hopNumber = hopNumber + 1
+		hopNumber += 1
 
 		if moreAddresses is False:
 			print '[Info] No more addresses to process'
@@ -186,14 +212,14 @@ def KMLWriteLocation(data, hopCount, arguments):
 			lon = str(data['lon'])
 			query = str(data['query'])
 			coordinates = '%s, %s' % (lon, lat)
-			if arguments.verbosity or arguments.debug: print 'Address:\t%s\nCity:\t\t%s\nCountry:\t%s\nISP:\t\t%s\nLat:\t\t%s\nLon:\t\t%s\n' % (query, city, country, isp, lat, lon)
+			if arguments.verbosity: print 'Address:\t%s\nCity:\t\t%s\nCountry:\t%s\nISP:\t\t%s\nLat:\t\t%s\nLon:\t\t%s\n' % (query, city, country, isp, lat, lon)
 			# writeText = '<Placemark>\n\t<name>%s</name>\n\t<description>\n\t\tIP Address:\t%s\n\t\tCountry:\t%s\n\t\tCity:\t\t%s\n\t\tISP:\t\t%s\n\t</description>\n\t<Point>\n\t\t<coordinates>\n\t\t\t%s\n\t\t</coordinates>\n\t</Point>\n</Placemark>\n' % (hopCount, address, country, city, isp, coordinates)
 			# KMLFile.write(writeText)
 			# KMLFile.close()
 	except IOError:
-		print 'IOError: File \'IP2.kml\' cannot be found. Even though this program created it, so stop messing with me.'
+		print '[Error] IOError: File \'%s\' cannot be found. Even though this program created it, so stop messing with me.' % arguments.output
 	except KeyError:
-		print 'Unexpected Keyerror. Wut?'
+		print '[Error] Unexpected Keyerror. Wut?'
 
 if __name__ == "__main__":
 	print '''
@@ -214,8 +240,9 @@ if __name__ == "__main__":
 
 	if WINDOWS:
 		print '[Info] Performing Windows Traceroute'
+		IPAddresses = []
 		pass # Go do Windows Traceroute
 	else:
 		print '[Info] Performing *nix Traceroute'
 		IPAddresses = nixTraceroute(args)
-	GEOIPLookup(IPAddresses, args)
+	GEOIPLookup(IPAddresses, args) # TODO: Error catching on empty list
