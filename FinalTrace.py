@@ -198,7 +198,7 @@ def GEOIPLookup(addresses, arguments):
 			if prevAddr == '0.0.0.0':
 				if args.verbosity: pWarn('[Warn] No previous address available.')
 			else:
-				pError('[Error] No information available for this address')
+				if args.verbosity: pError('[Error] No information available for this address')
 				address = prevAddr
 
 		r = requests.get(GEOLookup + str(address))
@@ -209,7 +209,7 @@ def GEOIPLookup(addresses, arguments):
 		hopNumber += 1
 
 		if moreAddresses is False:
-			pInfo('[Info] No more addresses to process')
+			pInfo('[Info] No more addresses to process\n')
 			pInfo('[Info] GEOIP Lookups completed')
 			pInfo('[Info] KML File populated')
 			return
@@ -244,27 +244,35 @@ def KMLWriteLocation(data, hopCount, arguments):
 				if args.debug: pError('[Error] And no, reading it in source doesn\'t count. Nice try.')
 				sys.exit()
 		else:
-			pError('[Error] No information available for this hop\n')
+			if args.verbosity: pError('[Error] No information available for this hop\n')
 	except IOError:
 		pError('[Error] IOError: File \'{0}\' cannot be found. Even though this program created it, so stop messing with me.'.format(arguments.output))
 	except KeyError:
 		pError('[Error] Unexpected Keyerror. Wut?')
 
 def pInfo(printString):
-	printString = printString.replace('[Info]', '[{0}Info{1}]')
-	print printString.format(bcolors.OKGREEN, bcolors.ENDC)
+	if OS != 'windows':
+		printString = printString.replace('[Info]', '[{0}Info{1}]')
+		printString = printString.format(bcolors.OKGREEN, bcolors.ENDC)
+	print printString
 
 def pDebug(printString):
-	printString = printString.replace('[Debug]', '[{0}Debug{1}]')
-	print printString.format(bcolors.OKBLUE, bcolors.ENDC)
+	if OS != 'windows':
+		printString = printString.replace('[Debug]', '[{0}Debug{1}]')
+		printString = printString.format(bcolors.OKBLUE, bcolors.ENDC)
+	print printString
 
 def pWarn(printString):
-	printString = printString.replace('[Warn]', '[{0}Warn{1}]')
-	print printString.format(bcolors.WARNING, bcolors.ENDC)
+	if OS != 'windows':
+		printString = printString.replace('[Warn]', '[{0}Warn{1}]')
+		printString = printString.format(bcolors.WARNING, bcolors.ENDC)
+	print printString
 
 def pError(printString):
-	printString = printString.replace('[Error]', '[{0}Error{1}]')
-	print printString.format(bcolors.FAIL, bcolors.ENDC)
+	if OS != 'windows':
+		printString = printString.replace('[Error]', '[{0}Error{1}]')
+		printString = printString.format(bcolors.FAIL, bcolors.ENDC)
+	print printString
 
 class bcolors:
     HEADER = '\033[95m'
