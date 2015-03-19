@@ -7,8 +7,8 @@ __author__ = 'Iain Smart'
 # TODO: Test on Windows (Done. Doesn't work.)
 # TODO: More KML Info
 # TODO: First hop information
-# TOMAYBEDO: Pi Screen Stuff
-# TODO: Add more sarcastic comments?
+# TODO: Add a whois lookup
+# TODO: Add more sarcastic comments
 
 import os
 import time
@@ -20,8 +20,16 @@ import argparse
 # Global constants
 GEOLookup = 'http://ip-api.com/json/'
 WHOIS = 'http://whois.domaintools.com/'
-if 'nt' in os.name: WINDOWS = True
-else: WINDOWS = False
+if sys.platform == "darwin":
+	OS = "osx"
+elif sys.platform == "linux2":
+	OS = "linux"
+elif sys.platform == "win32":
+	OS = "windows"
+else:
+	# If not OSx, Win, or Linux, kill program.
+	print "Unsupported OS. Program exiting."
+	sys.exit()
 
 def get_args():
 	# Arguments from command line
@@ -48,36 +56,39 @@ def get_args():
 	# Check if destination is hostname or IP
 	if not check_ip(arguments.destination):
 		if arguments.verbosity:
-			print '[Info] Inspection suggests destination is not an IP address'
-			print '[Info] Attempting to resolve \'%s\' to IP address' % arguments.destination
+			pInfo('[Info] Inspection suggests destination is not an IP address')
+			pInfo('[Info] Attempting to resolve \'{0}\' to IP address'.format(arguments.destination))
 
 		ip = DNS_Lookup(arguments.destination)
-		if arguments.verbosity: print '[Info] %s resolved successfully to %s' % (arguments.destination, ip)
+		if arguments.verbosity: pInfo('[Info] {0} resolved successfully to {1}'.format(arguments.destination, ip))
 		arguments.destination = ip
 
 	# Check if file specified by -o exists
 	try:
-		if arguments.verbosity: print '[Info] Checking if file %s exists' % arguments.output
+		if arguments.verbosity: pInfo('[Info] Checking if file {0} exists'.format(arguments.output))
 		outfile = open(arguments.output, 'r')
-		if arguments.debug: print '[Debug] File exists'
+		if arguments.debug: pDebug('[Debug] File {0} exists'.format(arguments.output))
 		outfile.close()
 	except IOError:
-		print '[Warn] File %s not found. Attempting to create.' % arguments.output
+		pWarn('[Warn] File {0} not found. Attempting to create.'.format(arguments.output))
 		try:
 			outfile = open(arguments.output, 'w')
-			print '[Info] File %s created' % arguments.output
+			pInfo('[Info] File {0} created'.format(arguments.output))
 			outfile.close()
 		except IOError:
-			print '[Error] Unable to create file. Exiting.'
+			pError('[Error] Unable to create file. Exiting.')
 			sys.exit()
-	if arguments.debug: arguments.verbosity = True
+	if arguments.debug:
+		arguments.verbosity = True
+		pInfo('[Info] Detected OS: {0}'.format(OS))
 	if arguments.verbosity:
-		print '[Info] Destination:\t%s' % arguments.destination
-		print '[Info] Byte Size:\t%s' % arguments.bytesize
-		print '[Info] Output File:\t%s' % arguments.output
-		print '[Info] Port:\t\t%s' % arguments.port
-		print '[Info] Max Hops:\t%s' % arguments.TTL
-		print
+		pInfo('''
+[Info] Destination:\t{0}
+[Info] Byte Size:\t{1}
+[Info] Output File:\t{2}
+[Info] Port:\t\t{3}
+[Info] Max Hops:\t{4}\n'''\
+			.format(arguments.destination, arguments.bytesize, arguments.output, arguments.port, arguments.TTL))
 	return arguments
 
 # Check if -d parameter is an IP Address
@@ -98,7 +109,7 @@ def DNS_Lookup(hostname):
 	try:
 		return socket.gethostbyname(hostname)
 	except socket.gaierror:
-		print '[Error] Unable to resolve hostname. Quitting.'
+		pError('[Error] Unable to resolve hostname. Quitting.')
 		sys.exit()
 
 # Actual Traceroute for *nix based systems
@@ -142,24 +153,24 @@ def nixTraceroute(arguments):
 				recv_socket.close()
 
 			if current_ip_address is not None:
-				current_host = "%s (%s)" % (current_name, current_ip_address)
+				current_host = "{0} ({1})".format(current_name, current_ip_address)
 			else:
 				current_host = "*"
 
 			IPAddresses.append(current_ip_address)
-			if args.verbosity or args.debug: print "%d\t%s" % (TTL, current_host)
+			if args.verbosity or args.debug: print "{0}\t{1}".format(TTL, current_host)
 
 			TTL += 1
 
 			if current_ip_address == destination or TTL > args.TTL:
 				if TTL > args.TTL:
-					print '\n[Warn] Max TTL Exceeded'
+					pWarn('\n[Warn] Max TTL Exceeded')
 				if current_ip_address == destination:
-					print '\n[Info] Destination reached'
+					pInfo('\n[Info] Destination reached')
 				break
 
 	except KeyboardInterrupt:
-		print '[Info] Keyboard Interrupt. Exiting Traceroute'
+		pWarn('[Warn]Keyboard Interrupt. Exiting Traceroute')
 	finally:
 		return IPAddresses
 
@@ -171,22 +182,23 @@ def GEOIPLookup(addresses, arguments):
 	prevAddr = '0.0.0.0'
 	hopNumber = 1
 
-	print '\n[Info] Beginning GeoIP Lookups'
-	if arguments.debug: print '[Debug] Address List: %s' % addresses
+	pInfo('\n[Info] Beginning GeoIP Lookups')
+	if arguments.debug: pDebug('[Debug] Address List: {0}'.format(addresses))
 	for address in addresses:
-		if arguments.debug: print '[Debug] Current Address: %s' % address
+		if arguments.debug: pDebug('[Debug] Current Address: {0}'.format(address))
 		moreAddresses = False # Default to nothing else to do. Fail closed, I guess.
 		for followingAddress in addresses[hopNumber::]: # To determine if there are any hosts still needing looked up
 			if followingAddress != address:
 				moreAddresses = True
 				break
 
-		if args.verbosity: print 'Hop number: %s' % hopNumber
+		if args.verbosity: print 'Hop number:\t{0}'.format(hopNumber)
 		if address is None:
-			if args.verbosity: print '[Warn] No address for this hop. Attempting to use previous address.'
+			if args.verbosity: pWarn('[Warn] No address for this hop. Attempting to use previous address.')
 			if prevAddr == '0.0.0.0':
-				if args.verbosity: print '[Warn] No previous address available.'
+				if args.verbosity: pWarn('[Warn] No previous address available.')
 			else:
+				pError('[Error] No information available for this address')
 				address = prevAddr
 
 		r = requests.get(GEOLookup + str(address))
@@ -197,8 +209,9 @@ def GEOIPLookup(addresses, arguments):
 		hopNumber += 1
 
 		if moreAddresses is False:
-			print '[Info] No more addresses to process'
-			print '[Info] GEOIP Lookups completed'
+			pInfo('[Info] No more addresses to process')
+			pInfo('[Info] GEOIP Lookups completed')
+			pInfo('[Info] KML File populated')
 			return
 def GenKML():
 	pass
@@ -206,7 +219,6 @@ def GenKML():
 def KMLWriteLocation(data, hopCount, arguments):
 	# Write to file
 	writeText = ''
-	if arguments.debug: print data
 	try:
 		if data['status'] == 'success':
 			city = str(data['city'])
@@ -216,25 +228,53 @@ def KMLWriteLocation(data, hopCount, arguments):
 			lon = str(data['lon'])
 			query = str(data['query'])
 			coordinates = '%s, %s' % (lon, lat)
-			if arguments.verbosity: print 'Address:\t%s\nCity:\t\t%s\nCountry:\t%s\nISP:\t\t%s\nLat:\t\t%s\nLon:\t\t%s\n' % (query, city, country, isp, lat, lon)
+			if arguments.verbosity: print 'Address:\t{0}\nCity:\t\t{1}\nCountry:\t{2}\nISP:\t\t{3}\nLat:\t\t{4}\nLon:\t\t{5}\n'.format(query, city, country, isp, lat, lon)
 			try:
-				if arguments.verbosity: print '[Info] Writing hop details to KML'
+				if arguments.debug: pDebug('[Debug] Writing hop details to KML')
 				KMLFile = open(arguments.output, 'a')
-				writeText = '<Placemark>\n\t<name>%s</name>\n\t<description>\n\t\tIP Address:\t%s\n\t\tCountry:\t%s\n\t\tCity:\t\t%s\n\t\tISP:\t\t%s\n\t</description>\n\t<Point>\n\t\t<coordinates>\n\t\t\t%s\n\t\t</coordinates>\n\t</Point>\n</Placemark>\n' % (hopCount, query, country, city, isp, coordinates)
+				writeText = '<Placemark>\n\t<name>{0}</name>\n\t<description>\n\t\tIP Address:\t{1}\n\t\tCountry:\t{2}\n\t\tCity:\t\t{3}\n\t\tISP:\t\t{4}\n\t</description>\n\t<Point>\n\t\t<coordinates>\n\t\t\t{5}\n\t\t</coordinates>\n\t</Point>\n</Placemark>\n'.format(hopCount, query, country, city, isp, coordinates)
 				KMLFile.write(writeText)
 				KMLFile.close()
 			except IOError:
-				print '[Error] Cannot open file. Even though this program created it. Did you delete it deliberately?'
-				print '[Error] Exiting program.'
+				pError('[Error] Cannot open file. Even though this program created it. Did you delete it deliberately?')
+				pError('[Error] Exiting program.')
 				sys.exit()
 			except NameError:
-				print '[Error] You should only see this error if the programmer cocked up. If you see it, I owe you a beer.'
-				if args.debug: print '[Error] And Greg, reading it in source doesn\'t count. Nice try.'
+				pError('[Error] You should only see this error if the programmer cocked up. If you see it, I owe you a beer.')
+				if args.debug: pError('[Error] And no, reading it in source doesn\'t count. Nice try.')
 				sys.exit()
+		else:
+			pError('[Error] No information available for this hop\n')
 	except IOError:
-		print '[Error] IOError: File \'%s\' cannot be found. Even though this program created it, so stop messing with me.' % arguments.output
+		pError('[Error] IOError: File \'{0}\' cannot be found. Even though this program created it, so stop messing with me.'.format(arguments.output))
 	except KeyError:
-		print '[Error] Unexpected Keyerror. Wut?'
+		pError('[Error] Unexpected Keyerror. Wut?')
+
+def pInfo(printString):
+	printString = printString.replace('[Info]', '[{0}Info{1}]')
+	print printString.format(bcolors.OKGREEN, bcolors.ENDC)
+
+def pDebug(printString):
+	printString = printString.replace('[Debug]', '[{0}Debug{1}]')
+	print printString.format(bcolors.OKBLUE, bcolors.ENDC)
+
+def pWarn(printString):
+	printString = printString.replace('[Warn]', '[{0}Warn{1}]')
+	print printString.format(bcolors.WARNING, bcolors.ENDC)
+
+def pError(printString):
+	printString = printString.replace('[Error]', '[{0}Error{1}]')
+	print printString.format(bcolors.FAIL, bcolors.ENDC)
+
+class bcolors:
+    HEADER = '\033[95m'
+    OKBLUE = '\033[94m'
+    OKGREEN = '\033[92m'
+    WARNING = '\033[93m'
+    FAIL = '\033[91m'
+    ENDC = '\033[0m'
+    BOLD = '\033[1m'
+    UNDERLINE = '\033[4m'
 
 if __name__ == "__main__":
 	print '''
@@ -248,30 +288,30 @@ if __name__ == "__main__":
 '''
 
 	# Check for root
-	if not WINDOWS and not os.getuid() == 0:
-		print '[Error] You do not have the required privileges to run this program.'
+	if OS != "windows" and not os.getuid() == 0:
+		pError('[Error] You do not have the required privileges to run this program.')
 		sys.exit()
 	# Get arguments from command line
 	args = get_args()
 
 	# Initialise KML File
-	if args.debug: print '[Debug] Initialising KML File'
 	try:
 		outfile = open(args.output, 'w')
 		outfile.write('<?xml version="1.0" encoding="UTF-8"?>\n<kml xmlns="http://earth.google.com/kml/2.0">\n<Document>')
 		outfile.close()
+		if args.debug: pDebug('[Debug] KML File initialised')
 	except IOError:
-		print '[Error] Cannot open file. Even though this program created it. Did you delete it deliberately?'
-		print '[Error] Exiting program.'
+		pError('[Error] Cannot open file. Even though this program created it. Did you delete it deliberately?')
+		pError('[Error] Exiting program.')
 		sys.exit()
 
 	# Perform system-specific Traceroute
-	if WINDOWS:
-		print '[Info] Performing Windows Traceroute'
+	if OS == "windows":
+		pInfo('[Info] Performing Windows Traceroute')
 		IPAddresses = []
 		pass # Go do Windows Traceroute
 	else:
-		print '[Info] Performing *nix Traceroute'
+		pInfo('[Info] Performing *nix Traceroute')
 		IPAddresses = nixTraceroute(args)
 
 	# Perform GEOLocation
@@ -282,14 +322,20 @@ if __name__ == "__main__":
 		outfile = open(args.output, 'a')
 		outfile.write('</Document>\n</kml>')
 		outfile.close()
+		if args.verbosity: pInfo('[Info] KML File finalised')
 	except IOError:
-		print '[Error] Cannot open file. Even though this program created it. Did you delete it deliberately?'
-		print '[Error] Exiting program.'
+		pError('[Error] Cannot open file. Even though this program created it. Did you delete it deliberately?')
+		pError('[Error] Exiting program.')
 		sys.exit()
 
 	# Open any external programs specified
 	if args.lE:
-		print '[Info] Opening KML in Google Earth'
-		os.system("open -a '/applications/Google Earth.app' {0}".format(args.output))
+		pInfo('[Info] Opening KML in Google Earth')
+		if OS == "windows":
+			os.system("start {0}".format(args.output))
+		elif OS == "osx":
+			os.system("open -a '/applications/Google Earth.app' {0}".format(args.output))
+		elif OS == "linux":
+			os.system("xdg-open {0}".format(args.output))
 
 	# TODO: Open Maps
