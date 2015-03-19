@@ -40,7 +40,6 @@ def get_args():
 		if arguments.verbosity: print '[Info] %s resolved successfully to %s' % (arguments.destination, ip)
 		arguments.destination = ip
 	if arguments.verbosity:
-		print
 		print '[Info] Destination:\t%s' % arguments.destination
 		print '[Info] Byte Size:\t%s' % arguments.bytesize
 		print '[Info] Output File:\t%s' % arguments.output
@@ -117,7 +116,7 @@ def nixTraceroute(arguments):
 				current_host = "*"
 
 			IPAddresses.append(current_ip_address)
-			print "%d\t%s" % (TTL, current_host)
+			if args.verbosity: print "%d\t%s" % (TTL, current_host)
 
 			TTL += 1
 
@@ -150,7 +149,6 @@ def GEOIPLookup(addresses, arguments):
 				break
 
 		if moreAddresses is False:
-			print
 			print '[Info] No more addresses to process'
 			print '[Info] GEOIP Lookups completed'
 			return
@@ -173,7 +171,7 @@ def GEOIPLookup(addresses, arguments):
 def GenKML():
 	pass
 
-def KMLWriteLocation(data, i, args):
+def KMLWriteLocation(data, hopCount, arguments):
 		# Write to file
 	writeText = ''
 	try:
@@ -185,7 +183,7 @@ def KMLWriteLocation(data, i, args):
 			lat = str(data['lat'])
 			lon = str(data['lon'])
 			coordinates = '%s, %s' % (lon, lat)
-			if args.verbosity: print 'City:\t\t%s\nCountry:\t%s\nISP:\t\t%s\nLat:\t\t%s\nLon:\t\t%s\n' % (city, country, isp, lat, lon)
+			if arguments.verbosity: print 'City:\t\t%s\nCountry:\t%s\nISP:\t\t%s\nLat:\t\t%s\nLon:\t\t%s\n' % (city, country, isp, lat, lon)
 			# writeText = '<Placemark>\n\t<name>%s</name>\n\t<description>\n\t\tIP Address:\t%s\n\t\tCountry:\t%s\n\t\tCity:\t\t%s\n\t\tISP:\t\t%s\n\t</description>\n\t<Point>\n\t\t<coordinates>\n\t\t\t%s\n\t\t</coordinates>\n\t</Point>\n</Placemark>\n' % (hopCount, address, country, city, isp, coordinates)
 			# KMLFile.write(writeText)
 			# KMLFile.close()
@@ -204,6 +202,10 @@ if __name__ == "__main__":
                        |___/
 				Iain Smart (1202028)
 '''
+	# Check for root
+	if not WINDOWS and not os.getuid() == 0:
+		print '[Error] You do not have the required privileges to run this program.'
+		sys.exit()
 	# Get arguments from command line
 	args = get_args()
 	if WINDOWS:
