@@ -26,6 +26,7 @@ def get_args():
 	parser = argparse.ArgumentParser(prog="FinalTrace")
 	parser.add_argument('-b', '--bytesize', default=512, type=int, help='Number of bytes to read on the receiving socket')
 	parser.add_argument('-d', '--destination', default='www.hacksoc.co.uk', type=str, help='Destination to trace to')
+	parser.add_argument('--debug', action='store_true', help='Enable Debugging Statements')
 	parser.add_argument('-o', '--output', default='Traceroute.kml', type=str, help='File to be used for KML')
 	parser.add_argument('-p', '--port', default=33464, type=int, help='Port to use for receiving packets')
 	parser.add_argument('-t', '--TTL', default=20, type=int, help='Maximum number of hops to target')
@@ -33,13 +34,13 @@ def get_args():
 
 	arguments = parser.parse_args()
 	if not check_ip(arguments.destination): # If hostname, not IP, has been entered
-		if arguments.verbosity: print '[Info] Inspection suggests destination is not an IP address'
+		if arguments.verbosity or arguments.debug: print '[Info] Inspection suggests destination is not an IP address'
 		print '[Info] Attempting to resolve \'%s\' to IP address' % arguments.destination
 
 		ip = DNS_Lookup(arguments.destination)
 		if arguments.verbosity: print '[Info] %s resolved successfully to %s' % (arguments.destination, ip)
 		arguments.destination = ip
-	if arguments.verbosity:
+	if arguments.verbosity or arguments.debug:
 		print '[Info] Destination:\t%s' % arguments.destination
 		print '[Info] Byte Size:\t%s' % arguments.bytesize
 		print '[Info] Output File:\t%s' % arguments.output
@@ -116,7 +117,7 @@ def nixTraceroute(arguments):
 				current_host = "*"
 
 			IPAddresses.append(current_ip_address)
-			if args.verbosity: print "%d\t%s" % (TTL, current_host)
+			if args.verbosity or args.debug: print "%d\t%s" % (TTL, current_host)
 
 			TTL += 1
 
@@ -141,23 +142,20 @@ def GEOIPLookup(addresses, arguments):
 	hopNumber = 1
 
 	print '\n[Info] Beginning GeoIP Lookups'
+	if arguments.debug: print '[Debug] %s' % addresses
 	for address in addresses:
+		if arguments.debug: print '[Debug] %s' % address
 		moreAddresses = False
 		for followingAddress in addresses[hopNumber::]: # To determine if there are any hosts still needing looked up
 			if followingAddress != address:
 				moreAddresses = True
 				break
 
-		if moreAddresses is False:
-			print '[Info] No more addresses to process'
-			print '[Info] GEOIP Lookups completed'
-			return
-
 		if args.verbosity: print 'Hop number: %s' % hopNumber
 		if address is None:
-			if args.verbosity: print '[Warn] No address for this hop. Attempting to use previous address.'
+			if args.verbosity or arguments.debug: print '[Warn] No address for this hop. Attempting to use previous address.'
 			if prevAddr == '0.0.0.0':
-				if args.verbosity: print '[Warn] No previous address available.'
+				if args.verbosity or arguments.debug: print '[Warn] No previous address available.'
 			else:
 				address = prevAddr
 
@@ -168,11 +166,15 @@ def GEOIPLookup(addresses, arguments):
 		prevAddr = address
 		hopNumber = hopNumber + 1
 
+		if moreAddresses is False:
+			print '[Info] No more addresses to process'
+			print '[Info] GEOIP Lookups completed'
+			return
 def GenKML():
 	pass
 
 def KMLWriteLocation(data, hopCount, arguments):
-		# Write to file
+	# Write to file
 	writeText = ''
 	try:
 		if data['status'] == 'success':
@@ -182,8 +184,9 @@ def KMLWriteLocation(data, hopCount, arguments):
 			isp = str(data['isp'])
 			lat = str(data['lat'])
 			lon = str(data['lon'])
+			query = str(data['query'])
 			coordinates = '%s, %s' % (lon, lat)
-			if arguments.verbosity: print 'City:\t\t%s\nCountry:\t%s\nISP:\t\t%s\nLat:\t\t%s\nLon:\t\t%s\n' % (city, country, isp, lat, lon)
+			if arguments.verbosity or arguments.debug: print 'Address:\t%s\nCity:\t\t%s\nCountry:\t%s\nISP:\t\t%s\nLat:\t\t%s\nLon:\t\t%s\n' % (query, city, country, isp, lat, lon)
 			# writeText = '<Placemark>\n\t<name>%s</name>\n\t<description>\n\t\tIP Address:\t%s\n\t\tCountry:\t%s\n\t\tCity:\t\t%s\n\t\tISP:\t\t%s\n\t</description>\n\t<Point>\n\t\t<coordinates>\n\t\t\t%s\n\t\t</coordinates>\n\t</Point>\n</Placemark>\n' % (hopCount, address, country, city, isp, coordinates)
 			# KMLFile.write(writeText)
 			# KMLFile.close()
@@ -208,6 +211,7 @@ if __name__ == "__main__":
 		sys.exit()
 	# Get arguments from command line
 	args = get_args()
+
 	if WINDOWS:
 		print '[Info] Performing Windows Traceroute'
 		pass # Go do Windows Traceroute
