@@ -1,12 +1,14 @@
 __author__ = 'Iain Smart'
 # Python Cross-Platform Traceroute
 # Code for traceroute adapted from https://blogs.oracle.com/ksplice/entry/learning_by_doing_writing_your, 28/07/2010
+# Also, I don't do serious code comments.
 
 # TODO: Map Line
 # TODO: Test on Windows (Done. Doesn't work.)
 # TODO: More KML Info
 # TODO: First hop information
 # TOMAYBEDO: Pi Screen Stuff
+# TODO: Add more sarcastic comments?
 
 import os
 import time
@@ -58,11 +60,13 @@ def get_args():
 		if arguments.verbosity: print '[Info] Checking if file %s exists' % arguments.output
 		outfile = open(arguments.output, 'r')
 		if arguments.debug: print '[Debug] File exists'
+		outfile.close()
 	except IOError:
 		print '[Warn] File %s not found. Attempting to create.' % arguments.output
 		try:
 			outfile = open(arguments.output, 'w')
 			print '[Info] File %s created' % arguments.output
+			outfile.close()
 		except IOError:
 			print '[Error] Unable to create file. Exiting.'
 			sys.exit()
@@ -202,9 +206,9 @@ def GenKML():
 def KMLWriteLocation(data, hopCount, arguments):
 	# Write to file
 	writeText = ''
+	if arguments.debug: print data
 	try:
 		if data['status'] == 'success':
-			# KMLFile = open('IP2.kml', 'a')
 			city = str(data['city'])
 			country = str(data['country'])
 			isp = str(data['isp'])
@@ -213,9 +217,20 @@ def KMLWriteLocation(data, hopCount, arguments):
 			query = str(data['query'])
 			coordinates = '%s, %s' % (lon, lat)
 			if arguments.verbosity: print 'Address:\t%s\nCity:\t\t%s\nCountry:\t%s\nISP:\t\t%s\nLat:\t\t%s\nLon:\t\t%s\n' % (query, city, country, isp, lat, lon)
-			# writeText = '<Placemark>\n\t<name>%s</name>\n\t<description>\n\t\tIP Address:\t%s\n\t\tCountry:\t%s\n\t\tCity:\t\t%s\n\t\tISP:\t\t%s\n\t</description>\n\t<Point>\n\t\t<coordinates>\n\t\t\t%s\n\t\t</coordinates>\n\t</Point>\n</Placemark>\n' % (hopCount, address, country, city, isp, coordinates)
-			# KMLFile.write(writeText)
-			# KMLFile.close()
+			try:
+				if arguments.verbosity: print '[Info] Writing hop details to KML'
+				KMLFile = open(arguments.output, 'a')
+				writeText = '<Placemark>\n\t<name>%s</name>\n\t<description>\n\t\tIP Address:\t%s\n\t\tCountry:\t%s\n\t\tCity:\t\t%s\n\t\tISP:\t\t%s\n\t</description>\n\t<Point>\n\t\t<coordinates>\n\t\t\t%s\n\t\t</coordinates>\n\t</Point>\n</Placemark>\n' % (hopCount, query, country, city, isp, coordinates)
+				KMLFile.write(writeText)
+				KMLFile.close()
+			except IOError:
+				print '[Error] Cannot open file. Even though this program created it. Did you delete it deliberately?'
+				print '[Error] Exiting program.'
+				sys.exit()
+			except NameError:
+				print '[Error] You should only see this error if the programmer cocked up. If you see it, I owe you a beer.'
+				if args.debug: print '[Error] And Greg, reading it in source doesn\'t count. Nice try.'
+				sys.exit()
 	except IOError:
 		print '[Error] IOError: File \'%s\' cannot be found. Even though this program created it, so stop messing with me.' % arguments.output
 	except KeyError:
@@ -238,6 +253,18 @@ if __name__ == "__main__":
 	# Get arguments from command line
 	args = get_args()
 
+	# Initialise KML File
+	if args.debug: print '[Debug] Initialising KML File'
+	try:
+		outfile = open(args.output, 'w')
+		outfile.write('<?xml version="1.0" encoding="UTF-8"?>\n<kml xmlns="http://earth.google.com/kml/2.0">\n<Document>')
+		outfile.close()
+	except IOError:
+		print '[Error] Cannot open file. Even though this program created it. Did you delete it deliberately?'
+		print '[Error] Exiting program.'
+		sys.exit()
+
+	# Perform system-specific Traceroute
 	if WINDOWS:
 		print '[Info] Performing Windows Traceroute'
 		IPAddresses = []
@@ -245,4 +272,20 @@ if __name__ == "__main__":
 	else:
 		print '[Info] Performing *nix Traceroute'
 		IPAddresses = nixTraceroute(args)
+
+	# Perform GEOLocation
 	GEOIPLookup(IPAddresses, args) # TODO: Error catching on empty list
+
+	# Finalise KML File
+	try:
+		outfile = open(args.output, 'a')
+		outfile.write('</Document>\n</kml>')
+		outfile.close()
+	except IOError:
+		print '[Error] Cannot open file. Even though this program created it. Did you delete it deliberately?'
+		print '[Error] Exiting program.'
+		sys.exit()
+
+	# Open any external programs specified
+	# TODO: Open Maps
+	# TODO: Open Earth
