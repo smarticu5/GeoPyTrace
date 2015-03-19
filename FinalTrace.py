@@ -70,7 +70,7 @@ def get_args():
 		except IOError:
 			print '[Error] Unable to create file. Exiting.'
 			sys.exit()
-
+	if arguments.debug: arguments.verbosity = True
 	if arguments.verbosity:
 		print '[Info] Destination:\t%s' % arguments.destination
 		print '[Info] Byte Size:\t%s' % arguments.bytesize
@@ -246,6 +246,7 @@ if __name__ == "__main__":
                        |___/
 				Iain Smart (1202028)
 '''
+
 	# Check for root
 	if not WINDOWS and not os.getuid() == 0:
 		print '[Error] You do not have the required privileges to run this program.'
@@ -287,5 +288,8 @@ if __name__ == "__main__":
 		sys.exit()
 
 	# Open any external programs specified
+	if args.lE:
+		print '[Info] Opening KML in Google Earth'
+		os.system("open -a '/applications/Google Earth.app' {0}".format(args.output))
+
 	# TODO: Open Maps
-	# TODO: Open Earth
