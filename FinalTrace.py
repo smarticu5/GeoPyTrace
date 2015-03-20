@@ -3,7 +3,6 @@ __author__ = 'Iain Smart'
 # Code for traceroute adapted from https://blogs.oracle.com/ksplice/entry/learning_by_doing_writing_your, 28/07/2010
 # Also, I don't do serious code comments.
 
-# TODO: Test on Windows (Done. Doesn't work.)
 # TODO: Add more sarcastic comments
 
 import os
@@ -421,7 +420,7 @@ if __name__ == "__main__":
 
 	# Perform GEOLocation
 	try:
-		GEOIPLookup(IPAddresses, args) # TODO: Error catching on empty list
+		GEOIPLookup(IPAddresses, args)
 	except IndexError:
 		pError('[Error] Index Error in IP Addresses. Exiting')
 		sys.exit()
