@@ -3,9 +3,8 @@ __author__ = 'Iain Smart'
 # Code for traceroute adapted from https://blogs.oracle.com/ksplice/entry/learning_by_doing_writing_your, 28/07/2010
 # Also, I don't do serious code comments.
 
-# TODO: Map Line
+# TODO: Map Line (and over surface)
 # TODO: Test on Windows (Done. Doesn't work.)
-# TODO: More KML Info
 # TODO: First hop information
 # TODO: Add a whois lookup
 # TODO: Add more sarcastic comments
@@ -19,7 +18,7 @@ import argparse
 
 # Global constants
 GEOLookup = 'http://ip-api.com/json/'
-WHOIS = 'http://whois.domaintools.com/'
+WHOIS = 'http://whois.domaintools.com/' # Not sure this is used. Oops.
 if sys.platform == "darwin":
 	OS = "osx"
 elif sys.platform == "linux2":
@@ -28,8 +27,10 @@ elif sys.platform == "win32":
 	OS = "windows"
 else:
 	# If not OSx, Win, or Linux, kill program.
-	print "Unsupported OS. Program exiting."
+	print "Naw Mate."
 	sys.exit()
+
+locations = []
 
 def get_args():
 	# Arguments from command line
@@ -115,7 +116,7 @@ def DNS_Lookup(hostname):
 # Actual Traceroute for *nix based systems
 def nixTraceroute(arguments):
 	byte_size = arguments.bytesize
-	port = arguments.port # Can be anything, really.
+	port = arguments.port
 	icmp = socket.getprotobyname('icmp')
 	udp = socket.getprotobyname('udp')
 	TTL = 1
@@ -125,9 +126,9 @@ def nixTraceroute(arguments):
 	try:
 		while True:
 			# Set up sending and receiving sockets
-			recv_socket = socket.socket(socket.AF_INET, socket.SOCK_RAW, icmp) # Using INET not INET6 for simplicity
-			recv_socket.settimeout(1) # Stop program hangs. Note: This wasn't in the original code from Oracle.
-			send_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM, udp)
+			send_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM, udp) # Send over UDP
+			recv_socket = socket.socket(socket.AF_INET, socket.SOCK_RAW, icmp) # Receive over ICMP
+			recv_socket.settimeout(1)
 
 			# Set up packet
 			send_socket.setsockopt(socket.SOL_IP, socket.IP_TTL, TTL)
@@ -175,12 +176,83 @@ def nixTraceroute(arguments):
 		return IPAddresses
 
 # Actual Traceroute for Windows systems
-def windowsTraceroute():
-	pass
+def windowsTraceroute(arguments):
+	byte_size = arguments.bytesize
+	port = arguments.port
+	icmp = socket.getprotobyname('icmp')
+	udp = socket.getprotobyname('udp')
+	TTL = 1
+	destination = arguments.destination
+	IPAddresses = []
+
+	try:
+		while True:
+			# Set up sending and receiving sockets
+			send_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM, udp) # Send over UDP
+			recv_socket = socket.socket(socket.AF_INET, socket.SOCK_RAW, icmp) # Receive over ICMP
+			recv_socket.settimeout(1)
+
+			# Set up packet
+			send_socket.setsockopt(socket.SOL_IP, socket.IP_TTL, TTL)
+			# Bind listener
+			recv_socket.bind(("", port))
+
+			#Send packet
+			send_socket.sendto("", (destination, port))
+			current_ip_address = None
+			current_name = None
+
+			try:
+				_, current_ip_address = recv_socket.recvfrom(byte_size)
+				current_ip_address = current_ip_address[0]
+				try:
+					current_name = socket.gethostbyaddr(current_ip_address)[0]
+				except socket.error:
+					current_name = '*'
+			except socket.error:
+				pass
+			finally:
+				send_socket.close()
+				recv_socket.close()
+
+			if current_ip_address is not None:
+				current_host = "{0} ({1})".format(current_name, current_ip_address)
+			else:
+				current_host = "*"
+
+			IPAddresses.append(current_ip_address)
+			if args.verbosity or args.debug: print "{0}\t{1}".format(TTL, current_host)
+
+			TTL += 1
+
+			if current_ip_address == destination or TTL > args.TTL:
+				if TTL > args.TTL:
+					pWarn('\n[Warn] Max TTL Exceeded')
+				if current_ip_address == destination:
+					pInfo('\n[Info] Destination reached')
+				break
+
+	except KeyboardInterrupt:
+		pWarn('[Warn]Keyboard Interrupt. Exiting Traceroute')
+	finally:
+		return IPAddresses
+
+
 
 def GEOIPLookup(addresses, arguments):
-	prevAddr = '0.0.0.0'
+	# Get current external IP address. Bypasses problem of not having a previous address.
+	if arguments.debug: pDebug('[Debug] Getting lookup info for current external address')
+	r = requests.get(GEOLookup)
+	data = r.json()
+	if str(data['status']) == "success" and arguments.debug:
+		pDebug('[Debug] Data returned for current address')
+		pDebug('[Debug] IP Address: {0}'.format(str(data['query'])))
+
+	prevAddr = str(data['query'])
+	prevData = data
 	hopNumber = 1
+
+	if arguments.verbosity: pInfo('[Info] External IP: ')
 
 	pInfo('\n[Info] Beginning GeoIP Lookups')
 	if arguments.debug: pDebug('[Debug] Address List: {0}'.format(addresses))
@@ -193,16 +265,15 @@ def GEOIPLookup(addresses, arguments):
 				break
 
 		if args.verbosity: print 'Hop number:\t{0}'.format(hopNumber)
+
 		if address is None:
-			if args.verbosity: pWarn('[Warn] No address for this hop. Attempting to use previous address.')
-			if prevAddr == '0.0.0.0':
-				if args.verbosity: pWarn('[Warn] No previous address available.')
-			else:
-				if args.verbosity: pError('[Error] No information available for this address')
-				address = prevAddr
+			if arguments.verbosity: pWarn('[Warn] No address available for hop {0}.'.format(hopNumber))
 
 		r = requests.get(GEOLookup + str(address))
 		data = r.json()
+		if str(data['status']) == 'fail':
+			if arguments.debug: pWarn('[Warn] {0}. Using data from previous hop.'.format(str(data['message'])))
+			data = prevData
 		KMLWriteLocation(data, hopNumber, args)
 
 		prevAddr = address
@@ -227,10 +298,11 @@ def KMLWriteLocation(data, hopCount, arguments):
 			lat = str(data['lat'])
 			lon = str(data['lon'])
 			query = str(data['query'])
-			coordinates = '%s, %s' % (lon, lat)
+			coordinates = '%s,%s' % (lon, lat)
+			locations.append(coordinates)
 			if arguments.verbosity: print 'Address:\t{0}\nCity:\t\t{1}\nCountry:\t{2}\nISP:\t\t{3}\nLat:\t\t{4}\nLon:\t\t{5}\n'.format(query, city, country, isp, lat, lon)
 			try:
-				if arguments.debug: pDebug('[Debug] Writing hop details to KML')
+				if arguments.debug: pDebug('[Debug] Writing hop details to KML\n')
 				KMLFile = open(arguments.output, 'a')
 				writeText = '<Placemark>\n\t<name>{0}</name>\n\t<description>\n\t\tIP Address:\t{1}\n\t\tCountry:\t{2}\n\t\tCity:\t\t{3}\n\t\tISP:\t\t{4}\n\t</description>\n\t<Point>\n\t\t<coordinates>\n\t\t\t{5}\n\t\t</coordinates>\n\t</Point>\n</Placemark>\n'.format(hopCount, query, country, city, isp, coordinates)
 				KMLFile.write(writeText)
@@ -249,6 +321,46 @@ def KMLWriteLocation(data, hopCount, arguments):
 		pError('[Error] IOError: File \'{0}\' cannot be found. Even though this program created it, so stop messing with me.'.format(arguments.output))
 	except KeyError:
 		pError('[Error] Unexpected Keyerror. Wut?')
+
+def KMLDrawLine(arguments):
+	kmlFile = open(arguments.output, 'a')
+	startText = '''
+
+    <Style id="blackLine">
+      <LineStyle>
+        <color>000000</color>
+        <width>4</width>
+      </LineStyle>
+      <PolyStyle>
+        <color>000000</color>
+      </PolyStyle>
+    </Style>
+    <Placemark>
+      <name>Absolute Extruded</name>
+      <description>Black Line</description>
+      <styleUrl>#blackLine</styleUrl>
+      <LineString>
+        <extrude>1</extrude>
+        <tessellate>1</tessellate>
+        <altitudeMode>absolute</altitudeMode>
+        <coordinates> \n'''
+
+	endText = '''\t\t</coordinates>
+      </LineString>
+    </Placemark>\n'''
+	prevLocation = 'placeholder'
+	if arguments.verbosity: pInfo('[Info] Generating line')
+
+	kmlFile.write(startText)
+	for location in locations:
+		if location != prevLocation:
+			if arguments.debug: pDebug('[Debug] Adding point {0}'.format(location))
+			kmlFile.write('\t\t\t' + location + '\n')
+			prevLocation = location
+		else:
+			if arguments.debug: pDebug('[Debug] Skipping point {0}, same as previous {1}'.format(location, prevLocation))
+	kmlFile.write(endText)
+	kmlFile.close()
 
 def pInfo(printString):
 	if OS != 'windows':
@@ -324,6 +436,9 @@ if __name__ == "__main__":
 
 	# Perform GEOLocation
 	GEOIPLookup(IPAddresses, args) # TODO: Error catching on empty list
+
+	# Draw KML Line
+	KMLDrawLine(args)
 
 	# Finalise KML File
 	try:
