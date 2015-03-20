@@ -3,10 +3,7 @@ __author__ = 'Iain Smart'
 # Code for traceroute adapted from https://blogs.oracle.com/ksplice/entry/learning_by_doing_writing_your, 28/07/2010
 # Also, I don't do serious code comments.
 
-# TODO: Map Line (and over surface)
 # TODO: Test on Windows (Done. Doesn't work.)
-# TODO: First hop information
-# TODO: Add a whois lookup
 # TODO: Add more sarcastic comments
 
 import os
@@ -39,7 +36,6 @@ def get_args():
 	# Important options
 	parser.add_argument('-d', '--destination', default='www.hacksoc.co.uk', type=str, help='Destination to trace to')
 	parser.add_argument('-o', '--output', default='Traceroute.kml', type=str, help='File to be used for KML')
-
 	# Packet specific settings
 	parser.add_argument('-b', '--bytesize', default=512, type=int, help='Number of bytes to read on the receiving socket')
 	parser.add_argument('-p', '--port', default=33464, type=int, help='Port to use for receiving packets')
@@ -63,7 +59,6 @@ def get_args():
 		ip = DNS_Lookup(arguments.destination)
 		if arguments.verbosity: pInfo('[Info] {0} resolved successfully to {1}'.format(arguments.destination, ip))
 		arguments.destination = ip
-
 	# Check if file specified by -o exists
 	try:
 		if arguments.verbosity: pInfo('[Info] Checking if file {0} exists'.format(arguments.output))
@@ -176,6 +171,7 @@ def nixTraceroute(arguments):
 		return IPAddresses
 
 # Actual Traceroute for Windows systems
+# And yes. This is the same as my Linux one. Deal with it.
 def windowsTraceroute(arguments):
 	byte_size = arguments.bytesize
 	port = arguments.port
@@ -214,6 +210,7 @@ def windowsTraceroute(arguments):
 			finally:
 				send_socket.close()
 				recv_socket.close()
+				time.sleep(1)
 
 			if current_ip_address is not None:
 				current_host = "{0} ({1})".format(current_name, current_ip_address)
@@ -236,8 +233,6 @@ def windowsTraceroute(arguments):
 		pWarn('[Warn]Keyboard Interrupt. Exiting Traceroute')
 	finally:
 		return IPAddresses
-
-
 
 def GEOIPLookup(addresses, arguments):
 	# Get current external IP address. Bypasses problem of not having a previous address.
@@ -267,7 +262,9 @@ def GEOIPLookup(addresses, arguments):
 		if args.verbosity: print 'Hop number:\t{0}'.format(hopNumber)
 
 		if address is None:
-			if arguments.verbosity: pWarn('[Warn] No address available for hop {0}.'.format(hopNumber))
+			if arguments.verbosity:
+				pWarn('[Warn] No address available for hop {0}.'.format(hopNumber))
+				pWarn('[Warn] Using address from hop {0}'.format(hopNumber - 1))
 
 		r = requests.get(GEOLookup + str(address))
 		data = r.json()
@@ -325,24 +322,12 @@ def KMLWriteLocation(data, hopCount, arguments):
 def KMLDrawLine(arguments):
 	kmlFile = open(arguments.output, 'a')
 	startText = '''
-
-    <Style id="blackLine">
-      <LineStyle>
-        <color>000000</color>
-        <width>4</width>
-      </LineStyle>
-      <PolyStyle>
-        <color>000000</color>
-      </PolyStyle>
-    </Style>
     <Placemark>
-      <name>Absolute Extruded</name>
-      <description>Black Line</description>
-      <styleUrl>#blackLine</styleUrl>
+      <description>Black Traceroute Line</description>
+      <styleUrl>#black</styleUrl>
       <LineString>
         <extrude>1</extrude>
         <tessellate>1</tessellate>
-        <altitudeMode>absolute</altitudeMode>
         <coordinates> \n'''
 
 	endText = '''\t\t</coordinates>
@@ -355,7 +340,7 @@ def KMLDrawLine(arguments):
 	for location in locations:
 		if location != prevLocation:
 			if arguments.debug: pDebug('[Debug] Adding point {0}'.format(location))
-			kmlFile.write('\t\t\t' + location + '\n')
+			kmlFile.write('\t\t\t' + location + ',1000\n')
 			prevLocation = location
 		else:
 			if arguments.debug: pDebug('[Debug] Skipping point {0}, same as previous {1}'.format(location, prevLocation))
@@ -435,7 +420,11 @@ if __name__ == "__main__":
 		IPAddresses = nixTraceroute(args)
 
 	# Perform GEOLocation
-	GEOIPLookup(IPAddresses, args) # TODO: Error catching on empty list
+	try:
+		GEOIPLookup(IPAddresses, args) # TODO: Error catching on empty list
+	except IndexError:
+		pError('[Error] Index Error in IP Addresses. Exiting')
+		sys.exit()
 
 	# Draw KML Line
 	KMLDrawLine(args)
